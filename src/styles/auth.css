@@ -1,0 +1,403 @@
+/* ============================================================
+   QuizDuel — Auth Pages Stylesheet
+   Theme: Deep Teal + Coral (matches the login/register design)
+   Use with: Login.jsx, Register.jsx, or any auth screen
+   ============================================================ */
+
+/* ---------- Design Tokens ---------- */
+:root{
+  --paper:#F0F7F6;
+  --card:#FFFFFF;
+  --ink:#0E4D4A;
+  --ink-soft:#1A6B66;
+  --coral:#E76F51;
+  --coral-soft:#F4A261;
+  --brick:#C1442E;
+  --border:#D6E8E5;
+  --text:#1A2E2C;
+  --text-muted:#5F7A76;
+  --radius-card:24px;
+  --radius-input:14px;
+  --shadow-card:
+    0 2px 4px rgba(14,77,74,.04),
+    0 12px 24px -8px rgba(14,77,74,.12),
+    0 40px 80px -20px rgba(14,77,74,.25);
+}
+
+/* ---------- Reset (scoped gently) ---------- */
+*,
+*::before,
+*::after{
+  box-sizing:border-box;
+}
+
+/* ---------- Page Background ---------- */
+body{
+  margin:0;
+  min-height:100vh;
+  background:var(--paper);
+  color:var(--text);
+  font-family:'Public Sans', system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+/* ---------- Animated Background Blobs ----------
+   Add these elements in JSX for the full effect:
+   <div className="bg-blob b1"></div>
+   <div className="bg-blob b2"></div>
+   <div className="bg-blob b3"></div>
+   -------------------------------------------------- */
+.bg-blob{
+  position:fixed;
+  border-radius:50%;
+  filter:blur(80px);
+  opacity:.35;
+  z-index:0;
+  pointer-events:none;
+  animation:blobFloat 12s ease-in-out infinite;
+}
+.bg-blob.b1{
+  width:500px;
+  height:500px;
+  background:radial-gradient(circle, #E76F51 0%, transparent 70%);
+  top:-180px;
+  left:-140px;
+  animation-delay:0s;
+}
+.bg-blob.b2{
+  width:600px;
+  height:600px;
+  background:radial-gradient(circle, #1A6B66 0%, transparent 70%);
+  bottom:-220px;
+  right:-180px;
+  animation-delay:-4s;
+}
+.bg-blob.b3{
+  width:350px;
+  height:350px;
+  background:radial-gradient(circle, #F4A261 0%, transparent 70%);
+  top:40%;
+  right:10%;
+  opacity:.2;
+  animation-delay:-8s;
+}
+@keyframes blobFloat{
+  0%, 100%{ transform:translate(0, 0) scale(1); }
+  33%     { transform:translate(30px, -25px) scale(1.08); }
+  66%     { transform:translate(-20px, 20px) scale(.95); }
+}
+
+/* ---------- Auth Wrapper (full-screen centering) ---------- */
+.authwrap{
+  position:relative;
+  z-index:1;
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+}
+
+/* ---------- Auth Card ---------- */
+.authcard{
+  position:relative;
+  width:100%;
+  max-width:440px;
+  background:var(--card);
+  border:1px solid rgba(255,255,255,.8);
+  border-radius:var(--radius-card);
+  padding:44px 40px;
+  box-shadow:var(--shadow-card);
+  animation:cardIn .5s cubic-bezier(.4, 0, .2, 1) both;
+}
+@keyframes cardIn{
+  from{ opacity:0; transform:translateY(16px); }
+  to  { opacity:1; transform:translateY(0);    }
+}
+
+/* Top accent bar inside the card */
+.authcard::before{
+  content:"";
+  position:absolute;
+  top:0;
+  left:24px;
+  right:24px;
+  height:4px;
+  border-radius:0 0 4px 4px;
+  background:linear-gradient(90deg, var(--coral) 0%, var(--coral-soft) 100%);
+  opacity:.9;
+}
+
+/* ---------- Headings ---------- */
+.authcard h1{
+  font-family:'Fraunces', Georgia, serif;
+  font-size:26px;
+  font-weight:600;
+  letter-spacing:-.02em;
+  color:var(--ink);
+  margin:0 0 8px;
+  line-height:1.2;
+}
+
+.authcard .sub{
+  font-size:14.5px;
+  color:var(--text-muted);
+  margin:0 0 28px;
+  line-height:1.5;
+}
+
+/* ---------- Form ---------- */
+.authcard form{
+  display:flex;
+  flex-direction:column;
+  gap:18px;
+}
+
+/* ---------- Field ---------- */
+.field{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.field label{
+  font-size:12.5px;
+  font-weight:600;
+  letter-spacing:.3px;
+  text-transform:uppercase;
+  color:var(--text-muted);
+}
+
+.field input{
+  width:100%;
+  padding:14px 16px;
+  font-family:inherit;
+  font-size:15px;
+  font-weight:500;
+  color:var(--text);
+  background:#FAFDFC;
+  border:1.5px solid var(--border);
+  border-radius:var(--radius-input);
+  outline:none;
+  transition:border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.field input::placeholder{
+  color:#A0BAB6;
+  font-weight:400;
+}
+
+.field input:hover{
+  border-color:#B5D4D0;
+  background:#FFFFFF;
+}
+
+.field input:focus{
+  border-color:var(--coral);
+  background:#FFFFFF;
+  box-shadow:0 0 0 4px rgba(231,111,81,.12);
+}
+
+/* Error state — add `field error` in JSX when validation fails */
+.field.error input{
+  border-color:var(--brick);
+  background:#FEF7F5;
+  box-shadow:0 0 0 4px rgba(193,68,46,.08);
+}
+
+.field .error-msg{
+  font-size:12px;
+  font-weight:500;
+  color:var(--brick);
+  margin-top:2px;
+}
+
+/* ---------- Buttons ---------- */
+.btn{
+  font-family:inherit;
+  font-size:15px;
+  font-weight:600;
+  letter-spacing:.3px;
+  border:none;
+  border-radius:var(--radius-input);
+  padding:15px 22px;
+  cursor:pointer;
+  transition:transform .2s ease, box-shadow .25s ease, background .25s ease;
+  position:relative;
+  overflow:hidden;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+}
+
+/* Solid primary button (teal gradient) */
+.btn.solid{
+  background:linear-gradient(135deg, #0E4D4A 0%, #083835 100%);
+  color:#FFFFFF;
+  box-shadow:0 6px 16px -6px rgba(14,77,74,.5);
+}
+
+/* Shimmer sweep on hover */
+.btn.solid::before{
+  content:"";
+  position:absolute;
+  top:0;
+  left:-100%;
+  width:100%;
+  height:100%;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+  transition:left .5s ease;
+}
+
+.btn.solid:hover{
+  transform:translateY(-2px);
+  box-shadow:0 12px 24px -8px rgba(14,77,74,.55);
+  background:linear-gradient(135deg, #1A6B66 0%, #0E4D4A 100%);
+}
+.btn.solid:hover::before{ left:100%; }
+
+.btn.solid:active{
+  transform:translateY(0);
+  box-shadow:0 6px 16px -6px rgba(14,77,74,.5);
+}
+
+.btn:disabled{
+  opacity:.7;
+  cursor:not-allowed;
+  transform:none;
+}
+
+/* Outline / ghost variant (optional) */
+.btn.ghost{
+  background:transparent;
+  color:var(--ink);
+  border:1.5px solid var(--border);
+}
+.btn.ghost:hover{
+  background:#FAFDFC;
+  border-color:#B5D4D0;
+}
+
+/* ---------- Switch Link (bottom of card) ---------- */
+.switchlink{
+  margin-top:24px;
+  padding-top:22px;
+  border-top:1px solid var(--border);
+  text-align:center;
+  font-size:14px;
+  color:var(--text-muted);
+}
+
+.switchlink a{
+  color:var(--ink);
+  font-weight:700;
+  text-decoration:none;
+  position:relative;
+  transition:color .15s ease;
+}
+
+.switchlink a::after{
+  content:"";
+  position:absolute;
+  bottom:-2px;
+  left:0;
+  width:0;
+  height:1.5px;
+  background:var(--coral);
+  transition:width .2s ease;
+}
+
+.switchlink a:hover{
+  color:var(--coral);
+}
+.switchlink a:hover::after{
+  width:100%;
+}
+
+/* ---------- Optional: Spinner for loading state ---------- */
+.spinner{
+  width:16px;
+  height:16px;
+  border-radius:50%;
+  border:2.5px solid rgba(255,255,255,.25);
+  border-top-color:#FFFFFF;
+  animation:spin .7s linear infinite;
+  display:inline-block;
+}
+@keyframes spin{
+  to{ transform:rotate(360deg); }
+}
+
+/* ---------- Optional: Inline Banner (error / success) ----------
+   <div className="banner">...</div>
+   <div className="banner success">...</div>
+   -------------------------------------------------------------- */
+.banner{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  padding:13px 15px;
+  margin-bottom:18px;
+  border-radius:12px;
+  font-size:13px;
+  font-weight:500;
+  line-height:1.45;
+  background:rgba(193,68,46,.06);
+  border:1px solid rgba(193,68,46,.18);
+  color:var(--brick);
+  animation:slideDown .3s ease;
+}
+.banner.success{
+  background:rgba(42,157,143,.08);
+  border-color:rgba(42,157,143,.25);
+  color:#1D6E64;
+}
+@keyframes slideDown{
+  from{ opacity:0; transform:translateY(-8px); }
+  to  { opacity:1; transform:translateY(0);    }
+}
+
+/* ---------- Divider (optional between form sections) ---------- */
+.divider{
+  display:flex;
+  align-items:center;
+  gap:16px;
+  margin:22px 0;
+  color:var(--text-muted);
+  font-size:12px;
+  font-weight:500;
+  letter-spacing:.5px;
+  text-transform:uppercase;
+}
+.divider::before,
+.divider::after{
+  content:"";
+  flex:1;
+  height:1px;
+  background:linear-gradient(to right, transparent, var(--border), transparent);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width:520px){
+  .authwrap{ padding:16px; }
+
+  .authcard{
+    border-radius:22px;
+    padding:32px 26px;
+  }
+
+  .authcard h1{ font-size:22px; }
+  .authcard .sub{ font-size:14px; margin-bottom:24px; }
+  .field input{ padding:13px 14px; font-size:14.5px; }
+  .btn{ padding:14px 18px; font-size:14.5px; }
+}
+
+/* ---------- Focus visible for accessibility ---------- */
+.btn:focus-visible,
+.switchlink a:focus-visible,
+.field input:focus-visible{
+  outline:2px solid var(--coral);
+  outline-offset:2px;
+}
