@@ -1,30 +1,42 @@
 import Card from "../components/ui/Card";
-import { LEADERBOARD } from "../data/mockData";
+import StateMessage from "../components/ui/StateMessage";
+import { useApi } from "../hooks/useApi";
+import { api } from "../services/api";
 
 export default function Leaderboard() {
+  const { data, loading, error } = useApi(() => api.getLeaderboard());
+
   return (
     <div className="page">
-      <Card title="Class Leaderboard — Section 3-Mabini">
-        <table>
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>Student</th>
-              <th>Points</th>
-              <th>Badges</th>
-            </tr>
-          </thead>
-          <tbody>
-            {LEADERBOARD.map((row, i) => (
-              <tr key={i}>
-                {row.map((cell, j) => (
-                  <td key={j}>{cell}</td>
+      <StateMessage loading={loading} error={error} />
+      {data && (
+        <Card title="Class Leaderboard">
+          {data.length === 0 ? (
+            <div className="muted">No students have joined yet.</div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Student</th>
+                  <th>Points</th>
+                  <th>Badges</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((r) => (
+                  <tr key={r.studentId}>
+                    <td>{r.rank}</td>
+                    <td>{r.name}</td>
+                    <td>{r.points}</td>
+                    <td>{r.badges}</td>
+                  </tr>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+              </tbody>
+            </table>
+          )}
+        </Card>
+      )}
     </div>
   );
 }

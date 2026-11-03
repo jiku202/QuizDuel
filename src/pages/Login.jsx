@@ -8,11 +8,21 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    login(email);
-    navigate("/dashboard");
+    setError("");
+    setSubmitting(true);
+    try {
+      await login(email, password);
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -20,6 +30,9 @@ export default function Login() {
       <div className="authcard">
         <h1>QuizDuel — Teacher Console</h1>
         <div className="sub">Log in to manage your class.</div>
+
+        {error && <div className="banner">{error}</div>}
+
         <form onSubmit={handleSubmit}>
           <div className="field">
             <label>Email</label>
@@ -41,8 +54,13 @@ export default function Login() {
               required
             />
           </div>
-          <button className="btn solid" style={{ width: "100%" }} type="submit">
-            Log in
+          <button
+            className="btn solid"
+            style={{ width: "100%" }}
+            type="submit"
+            disabled={submitting}
+          >
+            {submitting ? "Logging in..." : "Log in"}
           </button>
         </form>
         <div className="switchlink">
