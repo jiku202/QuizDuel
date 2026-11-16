@@ -35,6 +35,15 @@ CREATE TABLE IF NOT EXISTS enrollments (
   FOREIGN KEY (section_id) REFERENCES sections(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS topics (
+  id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+  section_id  BIGINT NOT NULL,
+  name        VARCHAR(120) NOT NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (section_id, name),
+  FOREIGN KEY (section_id) REFERENCES sections(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS questions (
   id              BIGINT AUTO_INCREMENT PRIMARY KEY,
   section_id      BIGINT NOT NULL,
@@ -106,3 +115,14 @@ CREATE TABLE IF NOT EXISTS user_badges (
   FOREIGN KEY (user_id)  REFERENCES users(id)  ON DELETE CASCADE,
   FOREIGN KEY (badge_id) REFERENCES badges(id) ON DELETE CASCADE
 );
+
+-- Points are kept per class (one row per student per section), and ranks come from them.
+ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS points INT NOT NULL DEFAULT 0;
+
+-- One-time move of the old per-user total into the student's classes (a no-op once users.total_points is 0).
+UPDATE enrollments SET points = (SELECT u.total_points FROM users u WHERE u.id = enrollments.student_id)
+  WHERE points = 0 AND student_id IN (SELECT id FROM users WHERE total_points > 0);
+UPDATE users SET total_points = 0 WHERE total_points > 0;
+
+-- Time of day a generated battle is scheduled for.
+ALTER TABLE battles ADD COLUMN IF NOT EXISTS battle_time VARCHAR(5);

@@ -57,7 +57,7 @@ public class BattleController {
     @PostMapping("/generate")
     public ResponseEntity<GenerateResult> generate(@RequestHeader(value = AUTH, required = false) String auth,
                                                    @RequestBody GenerateRequest body) {
-        GenerateResult r = battles.generate(guard.requireRole(auth, "teacher"), body.sectionId());
+        GenerateResult r = battles.generate(guard.requireRole(auth, "teacher"), body.sectionId(), body.battleTime(), body.weekendBattles());
         return ResponseEntity.status(r.alreadyExisted() ? HttpStatus.OK : HttpStatus.CREATED).body(r);
     }
 

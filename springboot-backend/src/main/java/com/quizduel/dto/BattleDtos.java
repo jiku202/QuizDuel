@@ -7,7 +7,11 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 public final class BattleDtos {
     private BattleDtos() {}
 
-    public record GenerateRequest(Long sectionId) {}
+    /**
+     * battleTime = "HH:mm" and weekendBattles are chosen by the teacher when generating; both are optional and
+     * default to the section's saved settings. Whatever is chosen is saved on the section.
+     */
+    public record GenerateRequest(Long sectionId, String battleTime, Boolean weekendBattles) {}
 
     /** topic is omitted when battles already existed for today. */
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -20,7 +24,7 @@ public final class BattleDtos {
     /** One row of the battle tables. winner/result/topic may be null. */
     public record BattleRow(long id, long sectionId, String date, String topic, String status, String statusLabel,
                             String result, int player1Score, int player2Score, String player1, String player2,
-                            String winner) {}
+                            String winner, String battleTime) {}
 
     public record SubmitResponse(int score, int total, BattleRow battle) {}
 }

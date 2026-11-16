@@ -1,7 +1,10 @@
 package com.quizduel.service;
 
 import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -9,8 +12,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.quizduel.dto.SectionDtos.AwardResponse;
-import com.quizduel.dto.SectionDtos.BadgeDto;
+import com.quizduel.dto.SectionDtos.AddMembersResponse;
 import com.quizduel.dto.SectionDtos.CreateSectionRequest;
 import com.quizduel.dto.SectionDtos.JoinResponse;
 import com.quizduel.dto.SectionDtos.RosterEntry;
@@ -31,8 +33,11 @@ public class SectionService {
     private final JdbcTemplate jdbc;
     private final SecureRandom random = new SecureRandom();
 
-    public SectionService(JdbcTemplate jdbc) {
+    private final RankService ranks;
+
+    public SectionService(JdbcTemplate jdbc, RankService ranks) {
         this.jdbc = jdbc;
+        this.ranks = ranks;
     }
 
     private static final RowMapper<SectionRow> ROW = (rs, i) -> new SectionRow(
@@ -67,7 +72,10 @@ public class SectionService {
                 req.gradeLevel() != null ? req.gradeLevel() : "Grade 3",
                 req.subject() != null ? req.subject() : "Araling Panlipunan",
                 newJoinCode());
-        return toDto(getById(id), null);
+        if (req.memberEmails() != null && !req.memberEmails().isEmpty()) {
+            enrollByEmail(id, req.memberEmails());
+        }
+        return toDto(getById(id), studentCount(id));
     }
 
     @Transactional
@@ -88,53 +96,56 @@ public class SectionService {
     @Transactional
     public SectionDto update(CurrentUser teacher, long sectionId, UpdateSectionRequest b) {
         SectionRow s = getOwned(teacher, sectionId);
+        if (b.name() != null && b.name().isBlank()) throw ApiException.badRequest("Section name cannot be empty");
         if (b.battleTime() != null && !TIME.matcher(b.battleTime()).matches()) {
             throw ApiException.badRequest("battleTime must be in 24-hour HH:MM format");
         }
         jdbc.update("UPDATE sections SET name = ?, grade_level = ?, subject = ?, battle_time = ?, weekend_battles = ? WHERE id = ?",
-                b.name() != null ? b.name() : s.name(),
+                b.name() != null ? b.name().trim() : s.name(),
                 b.gradeLevel() != null ? b.gradeLevel() : s.gradeLevel(),
                 b.subject() != null ? b.subject() : s.subject(),
                 b.battleTime() != null ? b.battleTime() : s.battleTime(),
                 b.weekendBattles() != null ? b.weekendBattles() : s.weekendBattles(),
                 s.id());
-        return toDto(getById(s.id()), null);
+        return toDto(getById(s.id()), studentCount(s.id()));
     }
 
+    /** Students of one section with the points and rank they have in THIS section. */
     public List<RosterEntry> roster(CurrentUser teacher, long sectionId) {
         SectionRow s = getOwned(teacher, sectionId);
+        List<RankService.Tier> tiers = ranks.tiers();
         return jdbc.query(
-                "SELECT u.id, u.name, u.email, u.total_points, u.streak, "
-                        + "(SELECT COUNT(*) FROM user_badges ub WHERE ub.user_id = u.id) AS badges "
+                "SELECT u.id, u.name, u.email, u.streak, e.points "
                         + "FROM enrollments e JOIN users u ON u.id = e.student_id "
-                        + "WHERE e.section_id = ? ORDER BY u.total_points DESC, u.name",
+                        + "WHERE e.section_id = ? ORDER BY e.points DESC, u.name",
                 (rs, i) -> new RosterEntry(rs.getLong("id"), rs.getString("name"), rs.getString("email"),
-                        rs.getInt("total_points"), rs.getInt("streak"), rs.getInt("badges")),
+                        rs.getInt("points"), rs.getInt("streak"), RankService.rankFor(tiers, rs.getInt("points"))),
                 s.id());
     }
 
-    /** Teacher hands a badge to a student in their section. */
+    /** Teacher deletes a section. Enrollments, questions and battles go with it (ON DELETE CASCADE). */
     @Transactional
-    public AwardResponse awardBadge(CurrentUser teacher, long sectionId, long studentId, Long badgeId) {
+    public void delete(CurrentUser teacher, long sectionId) {
         SectionRow s = getOwned(teacher, sectionId);
-        Validation.required("badgeId", badgeId);
-        Integer enrolled = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM enrollments WHERE section_id = ? AND student_id = ?", Integer.class, s.id(), studentId);
-        if (enrolled == null || enrolled == 0) throw ApiException.notFound("Student is not in this section");
+        jdbc.update("DELETE FROM sections WHERE id = ?", s.id());
+    }
 
-        List<BadgeDto> badges = jdbc.query("SELECT id, name, description, points_threshold FROM badges WHERE id = ?",
-                (rs, i) -> {
-                    int t = rs.getInt("points_threshold");
-                    Integer threshold = rs.wasNull() ? null : t;   // must be checked right after reading the column
-                    return new BadgeDto(rs.getLong("id"), rs.getString("name"), rs.getString("description"), threshold);
-                }, badgeId);
-        if (badges.isEmpty()) throw ApiException.notFound("Badge not found");
+    /** Teacher adds registered students to a section by email. */
+    @Transactional
+    public AddMembersResponse addMembers(CurrentUser teacher, long sectionId, List<String> emails) {
+        SectionRow s = getOwned(teacher, sectionId);
+        if (emails == null || emails.stream().noneMatch(e -> e != null && !e.isBlank())) {
+            throw ApiException.badRequest("Enter at least one student email");
+        }
+        return enrollByEmail(s.id(), emails);
+    }
 
-        Integer has = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM user_badges WHERE user_id = ? AND badge_id = ?", Integer.class, studentId, badgeId);
-        boolean awarded = has == null || has == 0;
-        if (awarded) jdbc.update("INSERT INTO user_badges (user_id, badge_id) VALUES (?, ?)", studentId, badgeId);
-        return new AwardResponse(awarded, badges.get(0));
+    /** Teacher removes a student from a section (the student's account is kept). */
+    @Transactional
+    public void removeMember(CurrentUser teacher, long sectionId, long studentId) {
+        SectionRow s = getOwned(teacher, sectionId);
+        int removed = jdbc.update("DELETE FROM enrollments WHERE section_id = ? AND student_id = ?", s.id(), studentId);
+        if (removed == 0) throw ApiException.notFound("Student is not in this section");
     }
 
     // ---------- shared helpers (also used by other services) ----------
@@ -143,6 +154,38 @@ public class SectionService {
         List<SectionRow> rows = jdbc.query("SELECT * FROM sections WHERE id = ? AND teacher_id = ?", ROW, sectionId, teacher.id());
         if (rows.isEmpty()) throw ApiException.notFound("Section not found");
         return rows.get(0);
+    }
+
+    private int studentCount(long sectionId) {
+        Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM enrollments WHERE section_id = ?", Integer.class, sectionId);
+        return n == null ? 0 : n;
+    }
+
+    /** Enrolls each email that belongs to a student account; reports the ones it could not add. */
+    private AddMembersResponse enrollByEmail(long sectionId, List<String> emails) {
+        Set<String> unique = new LinkedHashSet<>();
+        for (String e : emails) {
+            if (e != null && !e.isBlank()) unique.add(e.trim().toLowerCase());
+        }
+        List<RankService.Tier> tiers = ranks.tiers();
+        List<RosterEntry> added = new ArrayList<>();
+        List<String> notFound = new ArrayList<>();
+        List<String> alreadyIn = new ArrayList<>();
+        for (String email : unique) {
+            List<RosterEntry> users = jdbc.query(
+                    "SELECT id, name, email, streak FROM users WHERE LOWER(email) = ? AND role = 'student'",
+                    (rs, i) -> new RosterEntry(rs.getLong("id"), rs.getString("name"), rs.getString("email"),
+                            0, rs.getInt("streak"), RankService.rankFor(tiers, 0)),
+                    email);
+            if (users.isEmpty()) { notFound.add(email); continue; }
+            RosterEntry student = users.get(0);
+            Integer already = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM enrollments WHERE student_id = ? AND section_id = ?", Integer.class, student.id(), sectionId);
+            if (already != null && already > 0) { alreadyIn.add(email); continue; }
+            jdbc.update("INSERT INTO enrollments (student_id, section_id) VALUES (?, ?)", student.id(), sectionId);
+            added.add(student);
+        }
+        return new AddMembersResponse(added, notFound, alreadyIn);
     }
 
     private SectionRow getById(long id) {

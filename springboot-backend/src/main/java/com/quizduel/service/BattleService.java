@@ -34,12 +34,14 @@ import com.quizduel.util.Validation;
 @Service
 public class BattleService {
 
+    private static final java.util.regex.Pattern TIME = java.util.regex.Pattern.compile("^([01]\\d|2[0-3]):[0-5]\\d$");
+
     private static final Map<String, String> STATUS_LABEL =
             Map.of("pending", "Pending", "in_progress", "In Progress", "completed", "Completed");
 
     /** Shared SELECT behind every battle table. player2 NULL means the Practice Bot. */
     private static final String BATTLE_LIST_SQL =
-            "SELECT b.id, b.section_id, b.battle_date, b.topic, b.status, b.result, b.player1_score, b.player2_score, "
+            "SELECT b.id, b.section_id, b.battle_date, b.battle_time, b.topic, b.status, b.result, b.player1_score, b.player2_score, "
                     + "u1.name AS p1_name, COALESCE(u2.name, 'Practice Bot') AS p2_name "
                     + "FROM battles b JOIN users u1 ON u1.id = b.player1_id LEFT JOIN users u2 ON u2.id = b.player2_id";
 
@@ -64,7 +66,7 @@ public class BattleService {
         String winner = "p1".equals(result) ? p1 : "p2".equals(result) ? p2 : "draw".equals(result) ? "Draw" : null;
         return new BattleRow(rs.getLong("id"), rs.getLong("section_id"), rs.getString("battle_date"),
                 rs.getString("topic"), status, STATUS_LABEL.get(status), result,
-                rs.getInt("player1_score"), rs.getInt("player2_score"), p1, p2, winner);
+                rs.getInt("player1_score"), rs.getInt("player2_score"), p1, p2, winner, rs.getString("battle_time"));
     }
 
     // ------------------------------------------------------------------ teacher queries
@@ -101,17 +103,20 @@ public class BattleService {
      * Running it twice on the same day creates nothing the second time.
      */
     @Transactional
-    public GenerateResult generate(CurrentUser teacher, Long sectionId) {
+    public GenerateResult generate(CurrentUser teacher, Long sectionId, String battleTime, Boolean allowWeekend) {
         Validation.required("sectionId", sectionId);
         SectionRow section = sections.getOwned(teacher, sectionId);
         String date = clock.today();
+        String time = battleTime == null || battleTime.isBlank() ? section.battleTime() : battleTime.trim();
+        if (!TIME.matcher(time).matches()) throw ApiException.badRequest("battleTime must be HH:mm (24-hour)");
 
         Integer existing = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM battles WHERE section_id = ? AND battle_date = ?", Integer.class, section.id(), date);
         if (existing != null && existing > 0) return new GenerateResult(0, true, date, null);
 
         DayOfWeek day = LocalDate.parse(date).getDayOfWeek();
-        if ((day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) && !section.weekendBattles()) {
+        boolean weekendOk = allowWeekend != null ? allowWeekend : section.weekendBattles();
+        if ((day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) && !weekendOk) {
             throw ApiException.badRequest("Weekend battles are disabled for this section");
         }
 
@@ -124,6 +129,9 @@ public class BattleService {
         String topic = topics.get(random.nextInt(topics.size()));
         List<Long> pool = jdbc.queryForList("SELECT id FROM questions WHERE section_id = ? AND topic = ?", Long.class, section.id(), topic);
 
+        // the chosen time and weekend setting become the section's settings too
+        jdbc.update("UPDATE sections SET battle_time = ?, weekend_battles = ? WHERE id = ?", time, weekendOk, section.id());
+
         List<Long> order = new ArrayList<>(students);
         Collections.shuffle(order, random);
 
@@ -132,8 +140,8 @@ public class BattleService {
             Long p1 = order.get(i);
             Long p2 = i + 1 < order.size() ? order.get(i + 1) : null; // null = Practice Bot
             long battleId = Jdbc.insertReturningId(jdbc,
-                    "INSERT INTO battles (section_id, player1_id, player2_id, battle_date, topic, status) VALUES (?, ?, ?, ?, ?, 'pending')",
-                    section.id(), p1, p2, date, topic);
+                    "INSERT INTO battles (section_id, player1_id, player2_id, battle_date, battle_time, topic, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')",
+                    section.id(), p1, p2, date, time, topic);
 
             List<Long> picks = new ArrayList<>(pool);
             Collections.shuffle(picks, random);
@@ -219,7 +227,7 @@ public class BattleService {
 
     /**
      * Records one student's answers and scores them. When the opponent has also finished (or the opponent
-     * is the Practice Bot) the battle is finalized: winner, points, streaks and badges.
+     * is the Practice Bot) the battle is finalized: winner, per-class points (up for the winner, down for the loser) and streaks.
      */
     @Transactional
     public SubmitResponse submitAnswers(CurrentUser student, long battleId, List<AnswerItem> answers) {
@@ -274,7 +282,7 @@ public class BattleService {
 
     /**
      * Higher score wins. A tie between two students is broken by faster total time, otherwise it is a draw.
-     * The winner gets points, a streak +1 and any newly earned badges; the loser's streak resets.
+     * The winner gains points in that class and a streak +1; the loser loses points in that class and their streak resets.
      */
     private void finalizeBattle(long battleId) {
         Scores sc = jdbc.query(
@@ -301,14 +309,23 @@ public class BattleService {
         Long winnerId = "p1".equals(result) ? (Long) p1 : "p2".equals(result) ? p2 : null;
         jdbc.update("UPDATE battles SET result = ?, winner_id = ?, status = 'completed' WHERE id = ?", result, winnerId, battleId);
 
+        long sectionId = jdbc.queryForObject("SELECT section_id FROM battles WHERE id = ?", Long.class, battleId);
+        boolean botBattle = p2 == null;
         if (winnerId != null) {
-            int points = p2 == null ? GameRules.BOT_WIN_POINTS : GameRules.WIN_POINTS;
-            jdbc.update("UPDATE users SET total_points = total_points + ?, streak = streak + 1 WHERE id = ?", points, winnerId);
-            awardEarnedBadges(winnerId);
+            // points belong to the class the battle was played in
+            jdbc.update("UPDATE enrollments SET points = points + ? WHERE student_id = ? AND section_id = ?",
+                    botBattle ? GameRules.BOT_WIN_POINTS : GameRules.WIN_POINTS, winnerId, sectionId);
+            jdbc.update("UPDATE users SET streak = streak + 1 WHERE id = ?", winnerId);
         }
         if (!"draw".equals(result)) {
+            int loss = botBattle ? GameRules.BOT_LOSS_POINTS : GameRules.LOSS_POINTS;
             for (Long id : new Long[] {p1, p2}) {
-                if (id != null && !id.equals(winnerId)) jdbc.update("UPDATE users SET streak = 0 WHERE id = ?", id);
+                if (id != null && !id.equals(winnerId)) {
+                    // the loser drops points (never below 0), so their rank can go down
+                    jdbc.update("UPDATE enrollments SET points = CASE WHEN points > ? THEN points - ? ELSE 0 END "
+                            + "WHERE student_id = ? AND section_id = ?", loss, loss, id, sectionId);
+                    jdbc.update("UPDATE users SET streak = 0 WHERE id = ?", id);
+                }
             }
         }
     }
@@ -317,14 +334,5 @@ public class BattleService {
         Double t = jdbc.queryForObject("SELECT COALESCE(SUM(time_taken), 0) FROM battle_answers WHERE battle_id = ? AND student_id = ?",
                 Double.class, battleId, studentId);
         return t == null ? 0 : t;
-    }
-
-    /** Hands out every point-threshold badge the user now qualifies for. */
-    public void awardEarnedBadges(long userId) {
-        Integer points = jdbc.queryForObject("SELECT total_points FROM users WHERE id = ?", Integer.class, userId);
-        jdbc.update("INSERT INTO user_badges (user_id, badge_id) "
-                + "SELECT ?, b.id FROM badges b WHERE b.points_threshold IS NOT NULL AND b.points_threshold <= ? "
-                + "AND NOT EXISTS (SELECT 1 FROM user_badges ub WHERE ub.user_id = ? AND ub.badge_id = b.id)",
-                userId, points == null ? 0 : points, userId);
     }
 }

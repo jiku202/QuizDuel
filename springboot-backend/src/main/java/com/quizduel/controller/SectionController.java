@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,8 +14,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.quizduel.dto.SectionDtos.AwardBadgeRequest;
-import com.quizduel.dto.SectionDtos.AwardResponse;
+import com.quizduel.dto.SectionDtos.AddMembersRequest;
+import com.quizduel.dto.SectionDtos.AddMembersResponse;
 import com.quizduel.dto.SectionDtos.CreateSectionRequest;
 import com.quizduel.dto.SectionDtos.JoinResponse;
 import com.quizduel.dto.SectionDtos.JoinSectionRequest;
@@ -72,13 +73,28 @@ public class SectionController {
         return sections.roster(guard.requireRole(auth, "teacher"), id);
     }
 
-    /** Teacher manually awards a badge. 201 if newly awarded, 200 if the student already had it. */
-    @PostMapping("/{id}/roster/{studentId}/badges")
-    public ResponseEntity<AwardResponse> awardBadge(@RequestHeader(value = AUTH, required = false) String auth,
-                                                    @PathVariable("id") long id,
-                                                    @PathVariable("studentId") long studentId,
-                                                    @RequestBody AwardBadgeRequest body) {
-        AwardResponse r = sections.awardBadge(guard.requireRole(auth, "teacher"), id, studentId, body.badgeId());
-        return ResponseEntity.status(r.awarded() ? HttpStatus.CREATED : HttpStatus.OK).body(r);
+    /** Teacher deletes a section (and its roster, questions and battles). */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@RequestHeader(value = AUTH, required = false) String auth,
+                                       @PathVariable("id") long id) {
+        sections.delete(guard.requireRole(auth, "teacher"), id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Teacher adds students to a section by email. */
+    @PostMapping("/{id}/roster")
+    public AddMembersResponse addMembers(@RequestHeader(value = AUTH, required = false) String auth,
+                                         @PathVariable("id") long id,
+                                         @RequestBody AddMembersRequest body) {
+        return sections.addMembers(guard.requireRole(auth, "teacher"), id, body.emails());
+    }
+
+    /** Teacher removes a student from a section. */
+    @DeleteMapping("/{id}/roster/{studentId}")
+    public ResponseEntity<Void> removeMember(@RequestHeader(value = AUTH, required = false) String auth,
+                                             @PathVariable("id") long id,
+                                             @PathVariable("studentId") long studentId) {
+        sections.removeMember(guard.requireRole(auth, "teacher"), id, studentId);
+        return ResponseEntity.noContent().build();
     }
 }

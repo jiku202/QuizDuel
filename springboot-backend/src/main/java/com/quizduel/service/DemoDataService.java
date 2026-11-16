@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.quizduel.util.Jdbc;
 
 /**
- * Default badges (always) and demo data (first start only), matching the frontend mock content.
+ * Default rank tiers (always) and demo data (first start only), matching the frontend mock content.
  *   Teacher:  teacher@school.edu.ph / password123      Section join code: MABINI
  *   Students: ana@school.edu.ph, miguel@..., ella@..., liza@..., paolo@..., carlo@..., nina@..., joy@... / password123
  */
@@ -17,17 +17,17 @@ public class DemoDataService {
 
     private final JdbcTemplate jdbc;
     private final PasswordEncoder encoder;
-    private final BattleService battles;
 
-    public DemoDataService(JdbcTemplate jdbc, PasswordEncoder encoder, BattleService battles) {
+    public DemoDataService(JdbcTemplate jdbc, PasswordEncoder encoder) {
         this.jdbc = jdbc;
         this.encoder = encoder;
-        this.battles = battles;
     }
 
     @Transactional
     public void ensureDefaultBadges() {
+        // Rank tiers: a student's rank in a class is the highest tier their points in that class reach.
         Object[][] defaults = {
+                {"Newcomer", "Just joined the class", 0},
                 {"Rookie Scholar", "Earned 50 points", 50},
                 {"Bayani Badge", "Earned 150 points", 150},
                 {"History Buff", "Earned 300 points", 300},
@@ -61,10 +61,9 @@ public class DemoDataService {
         };
         for (Object[] s : students) {
             long id = Jdbc.insertReturningId(jdbc,
-                    "INSERT INTO users (name, email, password_hash, role, school, total_points) VALUES (?, ?, ?, 'student', 'Mabini Elementary School', ?)",
-                    s[0], s[1] + "@school.edu.ph", hash, s[2]);
-            jdbc.update("INSERT INTO enrollments (student_id, section_id) VALUES (?, ?)", id, sectionId);
-            battles.awardEarnedBadges(id);
+                    "INSERT INTO users (name, email, password_hash, role, school) VALUES (?, ?, ?, 'student', 'Mabini Elementary School')",
+                    s[0], s[1] + "@school.edu.ph", hash);
+            jdbc.update("INSERT INTO enrollments (student_id, section_id, points) VALUES (?, ?, ?)", id, sectionId, s[2]);
         }
 
         String[][] questions = {

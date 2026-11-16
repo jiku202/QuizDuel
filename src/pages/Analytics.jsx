@@ -4,9 +4,12 @@ import MasteryChart from "../components/ui/MasteryChart";
 import StateMessage from "../components/ui/StateMessage";
 import { useApi } from "../hooks/useApi";
 import { api } from "../services/api";
+import SortControl from "../components/ui/SortControl";
+import { useSort } from "../hooks/useSort";
 
 export default function Analytics() {
   const { data, loading, error } = useApi(() => api.getAnalytics());
+  const masterySort = useSort(data?.topicMastery || []);
 
   if (!data) {
     return (
@@ -28,7 +31,16 @@ export default function Analytics() {
         {data.topicMastery.length === 0 ? (
           <div className="muted">No battle answers yet.</div>
         ) : (
-          <MasteryChart data={data.topicMastery.map((t) => [t.topic, t.percent])} />
+          <>
+            <div style={{ marginBottom: 12 }}>
+              <SortControl
+                options={[{ key: "topic", label: "Topic" }, { key: "percent", label: "Mastery %" }]}
+                sort={masterySort.sort}
+                onChange={masterySort.setSort}
+              />
+            </div>
+            <MasteryChart data={masterySort.sorted.map((t) => [t.topic, t.percent])} />
+          </>
         )}
       </Card>
     </div>

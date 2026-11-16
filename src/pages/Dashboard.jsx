@@ -4,9 +4,15 @@ import MasteryChart from "../components/ui/MasteryChart";
 import StateMessage from "../components/ui/StateMessage";
 import { useApi } from "../hooks/useApi";
 import { api } from "../services/api";
+import { formatTime } from "../utils/formatTime";
+import SortTh from "../components/ui/SortTh";
+import SortControl from "../components/ui/SortControl";
+import { useSort } from "../hooks/useSort";
 
 export default function Dashboard() {
   const { data, loading, error } = useApi(() => api.getDashboard());
+  const battleSort = useSort(data?.todaysBattles || []);
+  const masterySort = useSort(data?.topicMastery || []);
 
   if (!data) {
     return (
@@ -31,7 +37,16 @@ export default function Dashboard() {
         {topicMastery.length === 0 ? (
           <div className="muted">No battle answers yet. Mastery appears after students play.</div>
         ) : (
-          <MasteryChart data={topicMastery.map((t) => [t.topic, t.percent])} />
+          <>
+            <div style={{ marginBottom: 12 }}>
+              <SortControl
+                options={[{ key: "topic", label: "Topic" }, { key: "percent", label: "Mastery %" }]}
+                sort={masterySort.sort}
+                onChange={masterySort.setSort}
+              />
+            </div>
+            <MasteryChart data={masterySort.sorted.map((t) => [t.topic, t.percent])} />
+          </>
         )}
       </Card>
 
@@ -42,15 +57,17 @@ export default function Dashboard() {
           <table>
             <thead>
               <tr>
-                <th>Player 1</th>
-                <th>Player 2</th>
-                <th>Topic</th>
-                <th>Status</th>
+                <SortTh label="Time" k="battleTime" {...battleSort} />
+                <SortTh label="Player 1" k="player1" {...battleSort} />
+                <SortTh label="Player 2" k="player2" {...battleSort} />
+                <SortTh label="Topic" k="topic" {...battleSort} />
+                <SortTh label="Status" k="statusLabel" {...battleSort} />
               </tr>
             </thead>
             <tbody>
-              {todaysBattles.map((b) => (
+              {battleSort.sorted.map((b) => (
                 <tr key={b.id}>
+                  <td>{formatTime(b.battleTime)}</td>
                   <td>{b.player1}</td>
                   <td>{b.player2}</td>
                   <td>{b.topic}</td>

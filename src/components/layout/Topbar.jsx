@@ -8,9 +8,9 @@ export default function Topbar() {
   const current = NAV_ITEMS.find((item) => item.to === location.pathname);
 
   return (
-    <div className="topbar">
+    <header className="topbar">
       <h2>{current ? current.label : ""}</h2>
-      <div className="who">{teacher?.name || "Mrs. Santos"} — Grade 3</div>
-    </div>
+      <div className="who">{[teacher?.name, teacher?.school].filter(Boolean).join(" — ")}</div>
+    </header>
   );
 }

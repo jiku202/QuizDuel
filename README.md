@@ -10,7 +10,7 @@ QuizDuel/
 
 ## Run it (two terminals)
 
-**1. Backend** — needs JDK 17+ and Maven (IntelliJ bundles Maven):
+**1. Backend** — needs JDK 25+ and Maven (IntelliJ bundles Maven):
 ```bash
 cd springboot-backend
 mvn spring-boot:run          # http://localhost:5000

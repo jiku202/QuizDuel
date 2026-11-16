@@ -27,11 +27,13 @@ public class QuestionService {
     private final JdbcTemplate jdbc;
     private final SectionScope scope;
     private final SectionService sections;
+    private final TopicService topics;
 
-    public QuestionService(JdbcTemplate jdbc, SectionScope scope, SectionService sections) {
+    public QuestionService(JdbcTemplate jdbc, SectionScope scope, SectionService sections, TopicService topics) {
         this.jdbc = jdbc;
         this.scope = scope;
         this.sections = sections;
+        this.topics = topics;
     }
 
     private static final RowMapper<QuestionDto> ROW = (rs, i) -> {
@@ -67,10 +69,12 @@ public class QuestionService {
         Validation.required("sectionId", b.sectionId());
         validate(b, false);
         long sectionId = sections.getOwned(teacher, b.sectionId()).id();
+        String topic = b.topic().trim();
+        topics.ensure(sectionId, topic);
         long id = Jdbc.insertReturningId(jdbc,
                 "INSERT INTO questions (section_id, topic, text, choice_a, choice_b, choice_c, choice_d, correct_answer, difficulty) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                sectionId, b.topic(), b.text(), b.choices().get("A"), b.choices().get("B"), b.choices().get("C"),
+                sectionId, topic, b.text(), b.choices().get("A"), b.choices().get("B"), b.choices().get("C"),
                 b.choices().get("D"), b.correctAnswer(), b.difficulty() != null ? b.difficulty() : "Easy");
         return jdbc.query("SELECT * FROM questions WHERE id = ?", ROW, id).get(0);
     }
@@ -80,10 +84,16 @@ public class QuestionService {
     public QuestionDto update(CurrentUser teacher, long id, QuestionRequest b) {
         QuestionDto q = owned(teacher, id);
         validate(b, true);
+        String topic = q.topic();
+        if (b.topic() != null) {
+            if (b.topic().isBlank()) throw ApiException.badRequest("topic cannot be empty");
+            topic = b.topic().trim();
+            topics.ensure(q.sectionId(), topic);   // moving a question to another topic of the same section
+        }
         Map<String, String> c = b.choices();
         jdbc.update("UPDATE questions SET topic = ?, text = ?, choice_a = ?, choice_b = ?, choice_c = ?, choice_d = ?, "
                         + "correct_answer = ?, difficulty = ? WHERE id = ?",
-                b.topic() != null ? b.topic() : q.topic(),
+                topic,
                 b.text() != null ? b.text() : q.text(),
                 c != null && c.get("A") != null ? c.get("A") : q.choices().get("A"),
                 c != null && c.get("B") != null ? c.get("B") : q.choices().get("B"),
