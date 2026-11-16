@@ -14,15 +14,12 @@ import com.quizduel.dto.InsightDtos.Dashboard;
 import com.quizduel.dto.InsightDtos.LeaderboardEntry;
 import com.quizduel.dto.InsightDtos.Stats;
 import com.quizduel.dto.InsightDtos.TopicMastery;
-import com.quizduel.dto.SectionDtos.BadgeDto;
 import com.quizduel.exception.ApiException;
 import com.quizduel.security.CurrentUser;
 import com.quizduel.util.AppClock;
-import com.quizduel.util.Jdbc;
 import com.quizduel.util.SectionScope;
-import com.quizduel.util.Validation;
 
-/** Read-only numbers: dashboard, analytics, leaderboard, badges. */
+/** Read-only numbers: dashboard, analytics, leaderboard and rank tiers. */
 @Service
 public class InsightService {
 
@@ -30,12 +27,14 @@ public class InsightService {
     private final SectionScope scope;
     private final AppClock clock;
     private final BattleService battles;
+    private final RankService ranks;
 
-    public InsightService(JdbcTemplate jdbc, SectionScope scope, AppClock clock, BattleService battles) {
+    public InsightService(JdbcTemplate jdbc, SectionScope scope, AppClock clock, BattleService battles, RankService ranks) {
         this.jdbc = jdbc;
         this.scope = scope;
         this.clock = clock;
         this.battles = battles;
+        this.ranks = ranks;
     }
 
     private int count(String sql, Object... args) {
@@ -87,11 +86,22 @@ public class InsightService {
         return new Analytics(averageScore(ids), battlesToday, students(ids), topicMastery(ids));
     }
 
-    /** Teacher: their sections (or ?sectionId). Student: must pass a section they joined. */
-    public List<LeaderboardEntry> leaderboard(CurrentUser user, String sectionId) {
-        List<Long> ids;
+    /**
+     * Teacher: sectionIds = comma-separated list of their sections; empty = all of their sections.
+     * Student: must pass sectionId of a section they joined.
+     * One row per student per section, each with the points the student has in that section only.
+     */
+    public List<LeaderboardEntry> leaderboard(CurrentUser user, String sectionId, String sectionIds) {
+        List<Long> ids = new ArrayList<>();
         if (user.isTeacher()) {
-            ids = scope.teacherSectionIds(user, sectionId);
+            if (sectionIds != null && !sectionIds.isBlank()) {
+                for (String part : sectionIds.split(",")) {
+                    if (part.isBlank()) continue;
+                    ids.addAll(scope.teacherSectionIds(user, part.trim()));
+                }
+            } else {
+                ids = scope.teacherSectionIds(user, sectionId);
+            }
         } else {
             if (sectionId == null || sectionId.isBlank()) throw ApiException.badRequest("sectionId is required");
             long sid = SectionScope.parseId(sectionId);
@@ -100,45 +110,40 @@ public class InsightService {
             }
             ids = List.of(sid);
         }
+        List<RankService.Tier> tiers = ranks.tiers();
         List<LeaderboardEntry> rows = jdbc.query(
-                "SELECT u.id, u.name, u.total_points, u.streak, (SELECT COUNT(*) FROM user_badges ub WHERE ub.user_id = u.id) AS badges "
-                        + "FROM users u WHERE u.id IN (SELECT student_id FROM enrollments WHERE section_id IN ("
-                        + SectionScope.placeholders(ids) + ")) ORDER BY u.total_points DESC, u.name",
-                (rs, i) -> new LeaderboardEntry(0, rs.getLong("id"), rs.getString("name"), rs.getInt("total_points"),
-                        rs.getInt("streak"), rs.getInt("badges")),
+                "SELECT e.section_id, s.name AS section_name, u.id, u.name, u.streak, e.points "
+                        + "FROM enrollments e JOIN users u ON u.id = e.student_id JOIN sections s ON s.id = e.section_id "
+                        + "WHERE e.section_id IN (" + SectionScope.placeholders(ids) + ") "
+                        + "ORDER BY e.points DESC, u.name, s.name",
+                (rs, i) -> new LeaderboardEntry(0, rs.getLong("id"), rs.getString("name"), rs.getLong("section_id"),
+                        rs.getString("section_name"), rs.getInt("points"), rs.getInt("streak"),
+                        RankService.rankFor(tiers, rs.getInt("points"))),
                 ids.toArray());
         List<LeaderboardEntry> ranked = new ArrayList<>();
         for (int i = 0; i < rows.size(); i++) {
             LeaderboardEntry r = rows.get(i);
-            ranked.add(new LeaderboardEntry(i + 1, r.studentId(), r.name(), r.points(), r.streak(), r.badges()));
+            ranked.add(new LeaderboardEntry(i + 1, r.studentId(), r.name(), r.sectionId(), r.sectionName(),
+                    r.points(), r.streak(), r.rank()));
         }
         return ranked;
     }
 
-    /** All badges. Students also get "earned" (true/false); teachers don't. */
+    /** The rank tiers (lowest first). Students also get "earned": whether their best section has reached the tier. */
     public List<Map<String, Object>> badges(CurrentUser user) {
-        List<Long> earned = user.isStudent()
-                ? jdbc.queryForList("SELECT badge_id FROM user_badges WHERE user_id = ?", Long.class, user.id())
-                : List.of();
-        return jdbc.query("SELECT id, name, description, points_threshold FROM badges ORDER BY id", (rs, i) -> {
+        Integer best = user.isStudent()
+                ? jdbc.queryForObject("SELECT COALESCE(MAX(points), 0) FROM enrollments WHERE student_id = ?", Integer.class, user.id())
+                : null;
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (RankService.Tier t : ranks.tiers()) {
             Map<String, Object> b = new LinkedHashMap<>();
-            b.put("id", rs.getLong("id"));
-            b.put("name", rs.getString("name"));
-            b.put("description", rs.getString("description"));
-            int t = rs.getInt("points_threshold");
-            b.put("pointsThreshold", rs.wasNull() ? null : t);
-            if (user.isStudent()) b.put("earned", earned.contains(rs.getLong("id")));
-            return b;
-        });
-    }
-
-    /** Teacher creates a custom badge (no point threshold) for manual awards. */
-    public BadgeDto createBadge(String name, String description) {
-        Validation.required("name", name);
-        if (count("SELECT COUNT(*) FROM badges WHERE name = ?", name) > 0) {
-            throw ApiException.conflict("A badge with that name already exists");
+            b.put("id", t.id());
+            b.put("name", t.name());
+            b.put("description", t.description());
+            b.put("pointsThreshold", t.threshold());
+            if (best != null) b.put("earned", best >= t.threshold());
+            out.add(b);
         }
-        long id = Jdbc.insertReturningId(jdbc, "INSERT INTO badges (name, description, points_threshold) VALUES (?, ?, NULL)", name, description);
-        return new BadgeDto(id, name, description, null);
+        return out;
     }
 }

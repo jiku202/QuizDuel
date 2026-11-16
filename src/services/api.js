@@ -51,12 +51,20 @@ export const api = {
   getSections: () => request("GET", "/sections"),
   createSection: (body) => request("POST", "/sections", body),
   updateSection: (id, body) => request("PUT", `/sections/${id}`, body),
+  deleteSection: (id) => request("DELETE", `/sections/${id}`),
   getRoster: (id) => request("GET", `/sections/${id}/roster`),
-  awardBadge: (sectionId, studentId, badgeId) =>
-    request("POST", `/sections/${sectionId}/roster/${studentId}/badges`, { badgeId }),
+  addMembers: (id, emails) => request("POST", `/sections/${id}/roster`, { emails }),
+  removeMember: (id, studentId) => request("DELETE", `/sections/${id}/roster/${studentId}`),
 
-  // badges
+  // rank tiers (ranks are automatic, based on points in a class)
   getBadges: () => request("GET", "/badges"),
+
+  // topics (inside a section's question bank)
+  listTopics: (sectionId) => request("GET", `/topics${qs({ sectionId })}`), // no sectionId = all sections
+  createTopic: (body) => request("POST", "/topics", body),
+  copyTopic: (id, body) => request("POST", `/topics/${id}/copy`, body),
+  renameTopic: (id, name) => request("PUT", `/topics/${id}`, { name }),
+  deleteTopic: (id) => request("DELETE", `/topics/${id}`),
 
   // questions
   getQuestions: (params) => request("GET", `/questions${qs(params)}`),
@@ -68,7 +76,8 @@ export const api = {
   // battles
   getTodaysBattles: (params) => request("GET", `/battles/today${qs(params)}`),
   getBattleLog: (params) => request("GET", `/battles/log${qs(params)}`),
-  generateBattles: (sectionId) => request("POST", "/battles/generate", { sectionId }),
+  generateBattles: (sectionId, battleTime, weekendBattles) =>
+    request("POST", "/battles/generate", { sectionId, battleTime, weekendBattles }),
 
   // insights
   getDashboard: (params) => request("GET", `/dashboard${qs(params)}`),

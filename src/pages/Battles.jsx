@@ -2,29 +2,60 @@ import { useState } from "react";
 import Card from "../components/ui/Card";
 import StateMessage from "../components/ui/StateMessage";
 import SectionPicker from "../components/ui/SectionPicker";
+import Modal from "../components/ui/Modal";
+import Notice from "../components/ui/Notice";
+import SortTh from "../components/ui/SortTh";
+import { useSort } from "../hooks/useSort";
 import { useApi } from "../hooks/useApi";
 import { api } from "../services/api";
+import { formatTime } from "../utils/formatTime";
 
 export default function Battles() {
   const sections = useApi(() => api.getSections());
   const [sectionId, setSectionId] = useState(""); // "" = all sections
   const [message, setMessage] = useState({ type: "", text: "" });
+  const [asking, setAsking] = useState(false); // time dialog open
+  const [time, setTime] = useState("15:00");
+  const [weekend, setWeekend] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const today = useApi(() => api.getTodaysBattles({ sectionId }), [sectionId]);
   const log = useApi(() => api.getBattleLog({ sectionId }), [sectionId]);
 
-  async function handleGenerate() {
+  const section = (sections.data || []).find((s) => String(s.id) === sectionId);
+
+  const todayRows = today.data || [];
+  const logRows = log.data || [];
+  const todaySort = useSort(todayRows);
+  const logSort = useSort(logRows, null, "asc", { score: (b) => b.player1Score + b.player2Score });
+
+  // Step 1: ask what time the battles are for (pre-filled with the section's usual time)
+  function askTime() {
+    setTime(section?.battleTime || "15:00");
+    setWeekend(!!section?.weekendBattles);
     setMessage({ type: "", text: "" });
+    setAsking(true);
+  }
+
+  // Step 2: generate with the chosen time
+  async function handleGenerate(e) {
+    e.preventDefault();
+    setBusy(true);
     try {
-      const res = await api.generateBattles(sectionId);
+      const res = await api.generateBattles(sectionId, time, weekend);
+      setAsking(false);
       setMessage(
         res.alreadyExisted
           ? { type: "", text: "Today's battles were already generated for this section." }
-          : { type: "success", text: `Created ${res.created} battle(s). Topic of the day: ${res.topic}.` }
+          : { type: "success", text: `Created ${res.created} battle(s) for ${formatTime(time)}. Topic of the day: ${res.topic}.` }
       );
       today.reload();
+      sections.reload();
     } catch (err) {
+      setAsking(false);
       setMessage({ type: "error", text: err.message });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -32,32 +63,41 @@ export default function Battles() {
     <div className="page">
       <div className="toolbar">
         <SectionPicker allowAll sections={sections.data || []} value={sectionId} onChange={setSectionId} />
-        <button className="btn solid" onClick={handleGenerate} disabled={!sectionId}>
+        <button className="btn solid" onClick={askTime} disabled={!sectionId}>
           Generate Today's Battles
         </button>
         {!sectionId && <span className="muted">Pick a section to generate its battles.</span>}
       </div>
-      {message.text && <div className={`notice ${message.type}`}>{message.text}</div>}
+      <Notice message={message} onClose={() => setMessage({ type: "", text: "" })} />
 
       <Card title="Today's Battles">
         <StateMessage loading={today.loading} error={today.error} />
         {today.data && today.data.length === 0 && <div className="muted">No battles today yet.</div>}
         {today.data && today.data.length > 0 && (
-          <table>
-            <thead>
-              <tr><th>Player 1</th><th>Player 2</th><th>Topic</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-              {today.data.map((b) => (
-                <tr key={b.id}>
-                  <td>{b.player1}</td>
-                  <td>{b.player2}</td>
-                  <td>{b.topic}</td>
-                  <td>{b.statusLabel}</td>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <SortTh label="Time" k="battleTime" {...todaySort} />
+                  <SortTh label="Player 1" k="player1" {...todaySort} />
+                  <SortTh label="Player 2" k="player2" {...todaySort} />
+                  <SortTh label="Topic" k="topic" {...todaySort} />
+                  <SortTh label="Status" k="statusLabel" {...todaySort} />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {todaySort.sorted.map((b) => (
+                  <tr key={b.id}>
+                    <td>{formatTime(b.battleTime)}</td>
+                    <td>{b.player1}</td>
+                    <td>{b.player2}</td>
+                    <td>{b.topic}</td>
+                    <td>{b.statusLabel}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 
@@ -65,24 +105,55 @@ export default function Battles() {
         <StateMessage loading={log.loading} error={log.error} />
         {log.data && log.data.length === 0 && <div className="muted">No completed battles yet.</div>}
         {log.data && log.data.length > 0 && (
-          <table>
-            <thead>
-              <tr><th>Date</th><th>Player 1</th><th>Player 2</th><th>Score</th><th>Winner</th></tr>
-            </thead>
-            <tbody>
-              {log.data.map((b) => (
-                <tr key={b.id}>
-                  <td>{b.date}</td>
-                  <td>{b.player1}</td>
-                  <td>{b.player2}</td>
-                  <td>{b.player1Score} – {b.player2Score}</td>
-                  <td>{b.winner}</td>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <SortTh label="Date" k="date" {...logSort} />
+                  <SortTh label="Player 1" k="player1" {...logSort} />
+                  <SortTh label="Player 2" k="player2" {...logSort} />
+                  <SortTh label="Score" k="score" {...logSort} />
+                  <SortTh label="Winner" k="winner" {...logSort} />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {logSort.sorted.map((b) => (
+                  <tr key={b.id}>
+                    <td>{b.date}</td>
+                    <td>{b.player1}</td>
+                    <td>{b.player2}</td>
+                    <td>{b.player1Score} – {b.player2Score}</td>
+                    <td>{b.winner}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
+
+      {asking && (
+        <Modal title="What time is the battle?" onClose={() => setAsking(false)}>
+          <form onSubmit={handleGenerate}>
+            <div className="field">
+              <label>Battle time{section ? ` — ${section.name}` : ""}</label>
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} required autoFocus />
+              <div className="hint">This also becomes the section's daily battle time.</div>
+            </div>
+            <label className="check" style={{ marginBottom: 4 }}>
+              <input type="checkbox" checked={weekend} onChange={(e) => setWeekend(e.target.checked)} />
+              <span>Allow weekend battles</span>
+            </label>
+            <div className="hint">Needed to generate battles on a Saturday or Sunday. Saved to the section's settings.</div>
+            <div className="actions">
+              <button type="button" className="btn" onClick={() => setAsking(false)}>Cancel</button>
+              <button type="submit" className="btn solid" disabled={busy || !time}>
+                {busy ? "Generating..." : "Generate Battles"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -13,7 +13,7 @@ public final class InsightDtos {
 
     public record Analytics(int averageScore, int battlesToday, int activeStudents, List<TopicMastery> topicMastery) {}
 
-    public record LeaderboardEntry(int rank, long studentId, String name, int points, int streak, int badges) {}
-
-    public record CreateBadgeRequest(String name, String description) {}
+    /** One row per student per section: a student in two sections appears twice, each with that section's points. */
+    public record LeaderboardEntry(int position, long studentId, String name, long sectionId, String sectionName,
+                                   int points, int streak, String rank) {}
 }

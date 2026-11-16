@@ -6,7 +6,7 @@ React app expects, so the frontend needs no changes.
 
 ## Run it
 
-Requires **JDK 17 or newer** and Maven (IntelliJ bundles Maven, so you don't need to install it).
+Requires **JDK 25 or newer** and Maven (IntelliJ bundles Maven, so you don't need to install it).
 
 **IntelliJ:** open the `springboot-backend` folder → let Maven import → run `QuizDuelApplication`.
 

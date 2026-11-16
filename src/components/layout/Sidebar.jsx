@@ -12,23 +12,25 @@ export default function Sidebar() {
   }
 
   return (
-    <div className="sidebar">
+    <aside className="sidebar">
       <div className="brand">QuizDuel</div>
-      <div className="brandsub">Teacher Console · Grade 3</div>
+      <div className="brandsub">Teacher Console</div>
 
-      {NAV_ITEMS.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          className={({ isActive }) => "navitem" + (isActive ? " active" : "")}
-        >
-          {item.label}
-        </NavLink>
-      ))}
+      <nav>
+        {NAV_ITEMS.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) => "navitem" + (isActive ? " active" : "")}
+          >
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
 
-      <div className="logout" onClick={handleLogout}>
+      <button type="button" className="logout" onClick={handleLogout}>
         Log out
-      </div>
-    </div>
+      </button>
+    </aside>
   );
 }
