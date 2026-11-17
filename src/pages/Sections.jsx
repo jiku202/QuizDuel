@@ -5,10 +5,24 @@ import Modal from "../components/ui/Modal";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import Notice from "../components/ui/Notice";
 import SortTh from "../components/ui/SortTh";
-import SortControl from "../components/ui/SortControl";
+import SortControl, { BY_NEWEST, alpha } from "../components/ui/SortControl";
+import EmptyState from "../components/ui/EmptyState";
+import { Person } from "../components/ui/Avatar";
+import { RankPill } from "../components/ui/Pill";
 import { useSort } from "../hooks/useSort";
 import { useApi } from "../hooks/useApi";
 import { api } from "../services/api";
+
+const CARD_SORTS = [
+  ...BY_NEWEST,
+  ...alpha("name"),
+  { label: "Most students", key: "studentCount", dir: "desc" },
+  { label: "Fewest students", key: "studentCount", dir: "asc" },
+];
+
+// "Grade 3" -> "G3"
+const shortGrade = (grade = "") =>
+  grade.split(/\s+/).filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 3) || "📘";
 
 const EMPTY_FORM = { name: "", gradeLevel: "Grade 3", subject: "Social Studies", members: "" };
 
@@ -90,7 +104,7 @@ export default function Sections() {
     [selectedId]
   );
 
-  const cardSort = useSort(list, "id", "asc", { studentCount: (c) => c.studentCount ?? 0 });
+  const cardSort = useSort(list, "id", "desc", { studentCount: (c) => c.studentCount ?? 0 });
   const rosterSort = useSort(roster.data || [], null, "asc", { rank: (r) => r.points });
 
   const update = (key) => (e) => setForm({ ...form, [key]: e.target.value });
@@ -191,7 +205,7 @@ export default function Sections() {
             notify("", "");
           }}
         >
-          {showCreate ? "Cancel" : "+ Create Section"}
+          {showCreate ? "Cancel" : "＋ Create Section"}
         </button>
       </div>
 
@@ -230,15 +244,11 @@ export default function Sections() {
       {/* Section cards */}
       <StateMessage loading={sections.loading && !sections.data} error={sections.error} />
       {!sections.loading && !sections.error && list.length === 0 && (
-        <div className="muted">No sections yet. Click "Create Section" to get started.</div>
+        <EmptyState icon="🏫" title="No sections yet">Click "+ Create Section" to set up your first class. You can add students right away or share the join code.</EmptyState>
       )}
       {list.length > 1 && (
         <SortControl
-          options={[
-            { key: "id", label: "Date created" },
-            { key: "name", label: "Name" },
-            { key: "studentCount", label: "Students" },
-          ]}
+          options={CARD_SORTS}
           sort={cardSort.sort}
           onChange={cardSort.setSort}
         />
@@ -248,7 +258,7 @@ export default function Sections() {
           {cardSort.sorted.map((s) => (
             <div
               key={s.id}
-              className={"section-card" + (s.id === selectedId ? " selected" : "")}
+              className={"section-card tone-" + (s.id % 6) + (s.id === selectedId ? " selected" : "")}
               onClick={() => selectSection(s.id === selectedId ? null : s.id)}
             >
               <SectionMenu
@@ -256,10 +266,11 @@ export default function Sections() {
                 onView={() => selectSection(s.id)}
                 onDelete={() => setDeleting(s)}
               />
+              <div className="sc-icon">{shortGrade(s.gradeLevel)}</div>
               <div className="sc-name">{s.name}</div>
               <div className="sc-sub">{s.gradeLevel} · {s.subject}</div>
               <div className="sc-foot">
-                <span>{s.studentCount ?? 0} student{s.studentCount === 1 ? "" : "s"}</span>
+                <span className="pill teal">👥 {s.studentCount ?? 0} student{s.studentCount === 1 ? "" : "s"}</span>
               </div>
             </div>
           ))}
@@ -270,8 +281,8 @@ export default function Sections() {
       {selected && (
         <Card title={`Class Roster — ${selected.name}`}>
           <div className="toolbar" style={{ marginBottom: 12 }}>
-            <span className="muted">
-              Join code: <strong>{showCode ? selected.joinCode : "••••••"}</strong>
+            <span className="code-box">
+              🔑 Join code: <strong>{showCode ? selected.joinCode : "••••••"}</strong>
             </span>
             <button className="btn small" onClick={() => setShowCode(!showCode)}>
               {showCode ? "Hide code" : "Show code"}
@@ -295,7 +306,7 @@ export default function Sections() {
 
           <StateMessage loading={roster.loading && !roster.data} error={roster.error} />
           {roster.data && roster.data.length === 0 && (
-            <div className="muted">No students yet. Add them by email or share the join code with your class.</div>
+            <EmptyState icon="🎓" title="No students yet">Add them by email above, or show the join code to your class so they can join themselves.</EmptyState>
           )}
           {roster.data && roster.data.length > 0 && (
             <div className="table-wrap"><table>
@@ -311,10 +322,10 @@ export default function Sections() {
               <tbody>
                 {rosterSort.sorted.map((s) => (
                   <tr key={s.id}>
-                    <td>{s.name}</td>
+                    <td><Person name={s.name} /></td>
                     <td>{s.email}</td>
-                    <td>{s.points}</td>
-                    <td>{s.rank}</td>
+                    <td><strong>{s.points}</strong> pts</td>
+                    <td><RankPill name={s.rank} /></td>
                     <td style={{ whiteSpace: "nowrap", textAlign: "right" }}>
                       <button className="btn small" onClick={() => setRemoving(s)}>Remove</button>
                     </td>

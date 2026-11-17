@@ -13,7 +13,7 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="brand">QuizDuel</div>
+      <div className="brand"><span className="logo">⚔️</span>QuizDuel</div>
       <div className="brandsub">Teacher Console</div>
 
       <nav>
@@ -23,12 +23,14 @@ export default function Sidebar() {
             to={item.to}
             className={({ isActive }) => "navitem" + (isActive ? " active" : "")}
           >
+            <span className="ni">{item.icon}</span>
             {item.label}
           </NavLink>
         ))}
       </nav>
 
       <button type="button" className="logout" onClick={handleLogout}>
+        <span className="ni">🚪</span>
         Log out
       </button>
     </aside>

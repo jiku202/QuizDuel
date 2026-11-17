@@ -1,6 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { NAV_ITEMS } from "../../config/navigation";
 import { useAuth } from "../../context/useAuth";
+import { Avatar } from "../ui/Avatar";
 
 export default function Topbar() {
   const location = useLocation();
@@ -9,8 +10,16 @@ export default function Topbar() {
 
   return (
     <header className="topbar">
-      <h2>{current ? current.label : ""}</h2>
-      <div className="who">{[teacher?.name, teacher?.school].filter(Boolean).join(" — ")}</div>
+      <h2>{current ? `${current.icon} ${current.label}` : ""}</h2>
+      {teacher?.name && (
+        <div className="who">
+          <div>
+            <strong>{teacher.name}</strong>
+            {teacher.school}
+          </div>
+          <Avatar name={teacher.name} large />
+        </div>
+      )}
     </header>
   );
 }

@@ -5,6 +5,10 @@ import SectionPicker from "../components/ui/SectionPicker";
 import Modal from "../components/ui/Modal";
 import Notice from "../components/ui/Notice";
 import SortTh from "../components/ui/SortTh";
+import EmptyState from "../components/ui/EmptyState";
+import Pill from "../components/ui/Pill";
+import { Person } from "../components/ui/Avatar";
+import { statusTone } from "../utils/badges";
 import { useSort } from "../hooks/useSort";
 import { useApi } from "../hooks/useApi";
 import { api } from "../services/api";
@@ -63,8 +67,8 @@ export default function Battles() {
     <div className="page">
       <div className="toolbar">
         <SectionPicker allowAll sections={sections.data || []} value={sectionId} onChange={setSectionId} />
-        <button className="btn solid" onClick={askTime} disabled={!sectionId}>
-          Generate Today's Battles
+        <button className="btn coral" onClick={askTime} disabled={!sectionId}>
+          ⚔️ Generate Today's Battles
         </button>
         {!sectionId && <span className="muted">Pick a section to generate its battles.</span>}
       </div>
@@ -72,7 +76,7 @@ export default function Battles() {
 
       <Card title="Today's Battles">
         <StateMessage loading={today.loading} error={today.error} />
-        {today.data && today.data.length === 0 && <div className="muted">No battles today yet.</div>}
+        {today.data && today.data.length === 0 && <EmptyState icon="⚔️" title="No battles today">Pick a section and click "Generate Today's Battles" to pair your students.</EmptyState>}
         {today.data && today.data.length > 0 && (
           <div className="table-wrap">
             <table>
@@ -88,11 +92,11 @@ export default function Battles() {
               <tbody>
                 {todaySort.sorted.map((b) => (
                   <tr key={b.id}>
-                    <td>{formatTime(b.battleTime)}</td>
-                    <td>{b.player1}</td>
-                    <td>{b.player2}</td>
+                    <td>🕒 {formatTime(b.battleTime)}</td>
+                    <td><Person name={b.player1} /></td>
+                    <td><Person name={b.player2} /></td>
                     <td>{b.topic}</td>
-                    <td>{b.statusLabel}</td>
+                    <td><Pill tone={statusTone(b.statusLabel)}>{b.statusLabel}</Pill></td>
                   </tr>
                 ))}
               </tbody>
@@ -103,7 +107,7 @@ export default function Battles() {
 
       <Card title="Battle Results Log">
         <StateMessage loading={log.loading} error={log.error} />
-        {log.data && log.data.length === 0 && <div className="muted">No completed battles yet.</div>}
+        {log.data && log.data.length === 0 && <EmptyState icon="🏁" title="No finished battles yet">Results appear here once students complete their duels.</EmptyState>}
         {log.data && log.data.length > 0 && (
           <div className="table-wrap">
             <table>
@@ -120,10 +124,10 @@ export default function Battles() {
                 {logSort.sorted.map((b) => (
                   <tr key={b.id}>
                     <td>{b.date}</td>
-                    <td>{b.player1}</td>
-                    <td>{b.player2}</td>
-                    <td>{b.player1Score} – {b.player2Score}</td>
-                    <td>{b.winner}</td>
+                    <td><Person name={b.player1} /></td>
+                    <td><Person name={b.player2} /></td>
+                    <td><strong>{b.player1Score} – {b.player2Score}</strong></td>
+                    <td>{b.winner && b.winner !== "Draw" ? <Pill tone="gold">🏆 {b.winner}</Pill> : <Pill>{b.winner || "—"}</Pill>}</td>
                   </tr>
                 ))}
               </tbody>

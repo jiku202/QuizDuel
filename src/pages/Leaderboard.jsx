@@ -4,6 +4,9 @@ import StateMessage from "../components/ui/StateMessage";
 import { useApi } from "../hooks/useApi";
 import { api } from "../services/api";
 import SortTh from "../components/ui/SortTh";
+import EmptyState from "../components/ui/EmptyState";
+import Pill, { RankPill } from "../components/ui/Pill";
+import { Person } from "../components/ui/Avatar";
 import { useSort } from "../hooks/useSort";
 
 export default function Leaderboard() {
@@ -57,21 +60,21 @@ export default function Leaderboard() {
       )}
 
       {sections.data && sectionList.length === 0 && (
-        <div className="muted">Create a section first (Sections page).</div>
+        <EmptyState icon="🏫" title="No sections yet">Create a section first (Sections page) to see its leaderboard.</EmptyState>
       )}
 
       {sectionList.length > 0 && (
         <Card title="Class Leaderboard">
           <StateMessage loading={board.loading} error={board.error} />
           {selected.length === 0 ? (
-            <div className="muted">Tick at least one section to see the leaderboard.</div>
+            <EmptyState icon="☑️" title="Pick a section">Tick at least one section above to see the leaderboard.</EmptyState>
           ) : (
             !board.loading &&
             board.data &&
             (rows.length === 0 ? (
-              <div className="muted">No students in the selected section(s) yet.</div>
+              <EmptyState icon="🎓" title="No students yet">Students show up here once they join the selected section(s).</EmptyState>
             ) : (
-              <table>
+              <div className="table-wrap"><table>
                 <thead>
                   <tr>
                     <SortTh label="#" k="position" {...sorter} />
@@ -84,15 +87,15 @@ export default function Leaderboard() {
                 <tbody>
                   {sorter.sorted.map((r) => (
                     <tr key={`${r.sectionId}-${r.studentId}`}>
-                      <td>{r.position}</td>
-                      <td>{r.name}</td>
-                      <td>{r.sectionName}</td>
-                      <td>{r.points}</td>
-                      <td>{r.rank}</td>
+                      <td>{["🥇", "🥈", "🥉"][r.position - 1] ? <span className="medal">{["🥇", "🥈", "🥉"][r.position - 1]}</span> : r.position}</td>
+                      <td><Person name={r.name} /></td>
+                      <td><Pill tone="purple">{r.sectionName}</Pill></td>
+                      <td><strong>{r.points}</strong> pts</td>
+                      <td><RankPill name={r.rank} /></td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             ))
           )}
         </Card>

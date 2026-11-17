@@ -1,9 +1,9 @@
 export const NAV_ITEMS = [
-  { to: "/dashboard", label: "Dashboard" },
-  { to: "/sections", label: "Sections" },
-  { to: "/questions", label: "Question Bank" },
-  { to: "/battles", label: "Battles" },
-  { to: "/leaderboard", label: "Leaderboard" },
-  { to: "/analytics", label: "Analytics" },
-  { to: "/settings", label: "Settings" },
+  { to: "/dashboard", label: "Dashboard", icon: "🏠" },
+  { to: "/sections", label: "Sections", icon: "👥" },
+  { to: "/questions", label: "Question Bank", icon: "📚" },
+  { to: "/battles", label: "Battles", icon: "⚔️" },
+  { to: "/leaderboard", label: "Leaderboard", icon: "🏆" },
+  { to: "/analytics", label: "Analytics", icon: "📊" },
+  { to: "/settings", label: "Settings", icon: "⚙️" },
 ];

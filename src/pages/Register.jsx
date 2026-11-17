@@ -28,9 +28,13 @@ export default function Register() {
 
   return (
     <div className="authwrap">
+      <div className="bg-blob b1"></div>
+      <div className="bg-blob b2"></div>
+      <div className="bg-blob b3"></div>
       <div className="authcard">
-        <h1>Create an Account</h1>
-        <div className="sub">For teachers using QuizDuel.</div>
+        <div className="auth-logo">🎓</div>
+        <h1>Create your account</h1>
+        <div className="sub">Set up QuizDuel for your classroom in a minute.</div>
 
         {done ? (
           <div>
