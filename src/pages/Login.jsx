@@ -27,9 +27,13 @@ export default function Login() {
 
   return (
     <div className="authwrap">
+      <div className="bg-blob b1"></div>
+      <div className="bg-blob b2"></div>
+      <div className="bg-blob b3"></div>
       <div className="authcard">
-        <h1>QuizDuel — Teacher Console</h1>
-        <div className="sub">Log in to manage your class.</div>
+        <div className="auth-logo">⚔️</div>
+        <h1>Welcome back, teacher!</h1>
+        <div className="sub">Log in to your QuizDuel console and see how your class is doing.</div>
 
         {error && <div className="banner">{error}</div>}
 

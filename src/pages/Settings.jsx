@@ -52,18 +52,14 @@ export default function Settings() {
               <label>Daily Battle Time</label>
               <input type="time" value={battleTime} onChange={(e) => setEdits({ ...edits, battleTime: e.target.value })} required />
             </div>
-            <div className="field" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <label className="check field">
               <input
                 type="checkbox"
-                style={{ width: "auto" }}
-                id="wk"
                 checked={weekendBattles}
                 onChange={(e) => setEdits({ ...edits, weekendBattles: e.target.checked })}
               />
-              <label htmlFor="wk" style={{ margin: 0, textTransform: "none", fontSize: 13 }}>
-                Allow weekend battles
-              </label>
-            </div>
+              <span>Allow weekend battles</span>
+            </label>
             {message.text && <div className={`notice ${message.type}`} style={{ marginBottom: 12 }}>{message.text}</div>}
             <button className="btn solid" type="submit">Save Settings</button>
           </form>

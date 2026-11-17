@@ -6,7 +6,10 @@ import KebabMenu from "../components/ui/KebabMenu";
 import Pager from "../components/ui/Pager";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import Notice from "../components/ui/Notice";
-import SortControl from "../components/ui/SortControl";
+import SortControl, { BY_NEWEST, alpha } from "../components/ui/SortControl";
+import EmptyState from "../components/ui/EmptyState";
+import Pill from "../components/ui/Pill";
+import { DIFFICULTY_TONE } from "../utils/badges";
 import { useSort } from "../hooks/useSort";
 import { useApi } from "../hooks/useApi";
 import { api } from "../services/api";
@@ -14,6 +17,19 @@ import { api } from "../services/api";
 const PAGE_SIZE = 10;
 
 const EMPTY_Q = { topic: "", text: "", A: "", B: "", C: "", D: "", correctAnswer: "A", difficulty: "Easy" };
+const TOPIC_SORTS = [
+  ...BY_NEWEST,
+  ...alpha("name"),
+  { label: "Most questions", key: "questionCount", dir: "desc" },
+  { label: "Fewest questions", key: "questionCount", dir: "asc" },
+  { label: "By section (A–Z)", key: "sectionName", dir: "asc" },
+];
+const QUESTION_SORTS = [
+  ...BY_NEWEST,
+  ...alpha("text"),
+  { label: "Easiest first", key: "difficulty", dir: "asc" },
+  { label: "Hardest first", key: "difficulty", dir: "desc" },
+];
 const DIFFICULTY_ORDER = { Easy: 1, Medium: 2, Hard: 3 };
 const EMPTY_TOPIC = { mode: "new", name: "", existingId: "", copyQuestions: true };
 
@@ -62,7 +78,7 @@ export default function QuestionBank() {
   );
 
   const questionList = !questions.loading && questions.data ? questions.data : [];
-  const questionSort = useSort(questionList, null, "asc", { difficulty: (q) => DIFFICULTY_ORDER[q.difficulty] ?? 9 });
+  const questionSort = useSort(questionList, "id", "asc", { difficulty: (q) => DIFFICULTY_ORDER[q.difficulty] ?? 9 });
 
   const topicsView = paginate(topicSort.sorted, topicPage);
   const questionsView = paginate(questionSort.sorted, questionPage);
@@ -235,7 +251,7 @@ export default function QuestionBank() {
         <h3>Question Bank</h3>
         {sectionList.length > 0 && (
           <button className={"btn " + (showTopicForm ? "" : "solid")} onClick={toggleTopicForm}>
-            {showTopicForm ? "Cancel" : "+ Add Topic"}
+            {showTopicForm ? "Cancel" : "＋ Add Topic"}
           </button>
         )}
       </div>
@@ -253,11 +269,7 @@ export default function QuestionBank() {
           {topicList.length > 1 && (
             <SortControl
               label="Sort topics"
-              options={[
-                { key: "sectionName", label: "Section" },
-                { key: "name", label: "Name" },
-                { key: "questionCount", label: "Number of questions" },
-              ]}
+              options={TOPIC_SORTS}
               sort={topicSort.sort}
               onChange={(s) => { topicSort.setSort(s); setTopicPage(1); }}
             />
@@ -327,9 +339,9 @@ export default function QuestionBank() {
 
       <StateMessage loading={topics.loading && !topics.data} error={topics.error} />
       {!topics.loading && topics.data && topicList.length === 0 && (
-        <div className="muted">
-          {sectionId ? "No topics in this section yet." : "No topics yet."} Click "+ Add Topic" to create one.
-        </div>
+        <EmptyState icon="📚" title={sectionId ? "No topics in this section yet" : "No topics yet"}>
+          Click "+ Add Topic" to create one, then fill it with questions.
+        </EmptyState>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -347,8 +359,8 @@ export default function QuestionBank() {
                 <div className="topic-row" onClick={() => toggleTopic(t)}>
                   <span className="t-arrow">{isOpen ? "▾" : "▸"}</span>
                   <span className="t-name">{t.name}</span>
-                  {!sectionId && <span className="t-sec">{t.sectionName}</span>}
-                  <span className="t-count">{t.questionCount} question{t.questionCount === 1 ? "" : "s"}</span>
+                  {!sectionId && <span className="t-sec">🏫 {t.sectionName}</span>}
+                  <span className="pill teal t-count">{t.questionCount} question{t.questionCount === 1 ? "" : "s"}</span>
                   <KebabMenu
                     items={[
                       { label: "Rename", onClick: () => { setRenamingId(t.id); setRenameValue(t.name); } },
@@ -370,11 +382,7 @@ export default function QuestionBank() {
                   {questionList.length > 1 && (
                     <SortControl
                       label="Sort questions"
-                      options={[
-                        { key: "text", label: "Question" },
-                        { key: "difficulty", label: "Difficulty" },
-                        { key: "correctAnswer", label: "Correct answer" },
-                      ]}
+                      options={QUESTION_SORTS}
                       sort={questionSort.sort}
                       onChange={(s) => { questionSort.setSort(s); setQuestionPage(1); }}
                     />
@@ -428,14 +436,14 @@ export default function QuestionBank() {
 
                   <StateMessage loading={questions.loading} error={questions.error} />
                   {!questions.loading && questions.data && questionList.length === 0 && (
-                    <div className="muted">No questions in this topic yet.</div>
+                    <EmptyState icon="❓" title="No questions yet">Click "+ Add Question" to write the first one for this topic.</EmptyState>
                   )}
 
                   {questionsView.rows.map((q) => (
                     <div key={q.id} className="qrow">
                       <div>
                         <div>{q.text}</div>
-                        <div className="meta">{q.difficulty} · Correct: {q.correctAnswer}</div>
+                        <div className="meta"><Pill tone={DIFFICULTY_TONE[q.difficulty]}>{q.difficulty}</Pill><Pill tone="teal">✔ Answer {q.correctAnswer}</Pill></div>
                       </div>
                       <div style={{ display: "flex", gap: 6 }}>
                         <button className="btn small" onClick={() => openEdit(q)}>Edit</button>
