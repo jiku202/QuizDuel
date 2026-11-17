@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">QuizDuel</string>
+    <string name="login_title">Welcome Back</string>
+    <string name="login_subtitle">Sign in to your QuizDuel account</string>
+    <string name="register_title">Create Account</string>
+    <string name="register_subtitle">Join the QuizDuel community</string>
+</resources>
